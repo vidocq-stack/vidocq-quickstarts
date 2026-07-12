@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.example</groupId>
+    <artifactId>greeting-service</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>Vidocq Greeting Service</name>
+    <description>Sample REST service on the Vidocq Runtime (Jakarta REST via Cassini,
+        CDI Lite via Vauban, HTTP via Chappe, MicroProfile Config via Ravel).</description>
+
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <vidocq.version>0.1.1</vidocq.version>
+    </properties>
+
+    <!-- Vidocq 0.1.1 is published on Maven Central — no extra repository needed. -->
+
+    <dependencies>
+        <!-- Vidocq Runtime core: boot orchestrator + extension SPI. -->
+        <dependency>
+            <groupId>io.vidocq.runtime</groupId>
+            <artifactId>vidocq-runtime-core</artifactId>
+            <version>${vidocq.version}</version>
+        </dependency>
+
+        <!-- Jakarta REST 4.0 (Cassini) + HTTP transport (Chappe) + JSON-B (Champollion),
+             wired into the runtime as an extension. Also brings CDI Lite (Vauban). -->
+        <dependency>
+            <groupId>io.vidocq.runtime</groupId>
+            <artifactId>vidocq-runtime-cassini-rest-extension</artifactId>
+            <version>${vidocq.version}</version>
+        </dependency>
+
+        <!-- MicroProfile Config (Ravel) — provides @ConfigProperty injection.
+             No codegen companion, so it isn't listed in annotationProcessorPaths. -->
+        <dependency>
+            <groupId>io.vidocq.runtime</groupId>
+            <artifactId>vidocq-runtime-ravel-extension</artifactId>
+            <version>${vidocq.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>greeting-service</finalName>
+        <plugins>
+            <!-- APT code generation. Every vidocq-runtime-*-extension on the classpath
+                 must be paired with its companion *-extension-codegen annotation
+                 processor here (enforced by the plugin's checkpom goal), plus the
+                 core-codegen that builds the CDI bean index. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <!-- The *-codegen artifacts are pom-packaged aggregators that pull
+                         the real APT processors transitively, hence <type>pom</type>. -->
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>io.vidocq.runtime</groupId>
+                            <artifactId>vidocq-runtime-core-codegen</artifactId>
+                            <version>${vidocq.version}</version>
+                            <type>pom</type>
+                        </path>
+                        <path>
+                            <groupId>io.vidocq.runtime</groupId>
+                            <artifactId>vidocq-runtime-cassini-rest-extension-codegen</artifactId>
+                            <version>${vidocq.version}</version>
+                            <type>pom</type>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>io.vidocq.runtime</groupId>
+                <artifactId>vidocq-runtime-maven-plugin</artifactId>
+                <version>${vidocq.version}</version>
+                <configuration>
+                    <!-- Format is module/mainclass; the generated launcher runs it via java's module flag. -->
+                    <mainClass>io.example.greeting/io.example.greeting.App</mainClass>
+                    <scriptName>greeting-service</scriptName>
+                    <!-- Non-empty on purpose: the 0.1.1 plugin NPEs on a null jvmArgs
+                         (an empty element collapses to null), so pass a benign flag. -->
+                    <jvmArgs>-Dfile.encoding=UTF-8</jvmArgs>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <!-- checkpom: verify each extension is paired with its codegen -->
+                            <goal>checkpom</goal>
+                            <!-- generate: build the CDI bean index (process-classes) -->
+                            <goal>generate</goal>
+                            <!-- package: standalone distribution (classpath launcher script) -->
+                            <goal>package</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <!-- Tip: for a self-contained image add the `jlink` goal, but that
+                     requires a modular app (module-info.java + <mainModule>). -->
+            </plugin>
+        </plugins>
+    </build>
+</project>
